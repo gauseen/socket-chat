@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<title>socket.io</title>
+	<link rel="stylesheet" href="./main.css">
+</head>
+<body>
+	<section class="chat__window">
+		<div class="chat__log" id="chat__log"> </div>
+		<div class="chat__enter">
+			<input type="text" autofocus="autofocus" placeholder=" enter ..." class="chat__input__test" id="chat__input__test">
+		</div>
+		<div class="chat__bg" id="chat__bg">
+			<div class="chat__bg__contain">
+				<p>请输入你的名字！</p>
+				<input type="text" id="chat__bg__enter_name" autofocus="autofocus">
+			</div>
+		</div>
+	</section>
+
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.js"></script>
+	<script>
+		window.onload = function () {
+			var chatroom = new Chatroom()
+			chatroom.init()
+		}
+
+		function Chatroom () {
+			this.socket = io()
+			this.userName = null
+			this.$ = (el) => {
+				return document.querySelector(el)
+			}
+		}
+
+		Chatroom.prototype = {
+			init: function () {
+				var instance = this
+				var socket = instance.socket
+				var $ = instance.$
+
+				socket.on('connect', () => {
+					socket.on('news', (msg) => {
+						instance.methods.showPanel.call(instance, msg)
+					})
+					socket.on('login', (name) => {
+						instance.userName = name
+					})
+					socket.on('userJoined', (userInfo) => {
+						instance.methods.appendDom.call(instance, {msg: '加入了群聊 ...', userName: userInfo, flag: 'joined'})
+					})
+					socket.on('userLeave', (msg) => {
+						instance.methods.appendDom.call(instance, {msg: msg, flag: 'leaved'})
+					})
+
+				})
+
+				instance.bind()
+				$('#chat__bg__enter_name').focus()
+			},
+			methods: {
+				enter: function () {
+					var instance = this
+					var socket = instance.socket
+					var $ = instance.$
+
+					if (instance.userName) {
+						var chatTxt = $('#chat__input__test').value
+						if (chatTxt) {
+							socket.send(chatTxt)
+							$('#chat__input__test').value = ''
+							instance.methods.appendDom.call(instance, {msg: chatTxt, userName: instance.userName})
+						}
+					} else {
+						var enterName = $('#chat__bg__enter_name').value
+						if (enterName && enterName.length < 15) {
+							$('#chat__bg__enter_name').value = ''
+							socket.emit('addUser', enterName)
+							$('#chat__bg').style.display = 'none'
+							$('#chat__input__test').focus()
+						} else if (enterName) {
+							window.alert('你太长了..., 再短点好不好...')
+						}
+					}
+				},
+				showPanel: function (msg) {
+					var instance = this
+					instance.methods.appendDom.call(instance, msg)
+				},
+				appendDom: function ({msg, userName, flag}) {
+					var instance = this
+					var socket = instance.socket
+					var $ = instance.$
+					var liEle
+
+					if (!instance.userName) return
+
+					if (flag === 'others') {
+						liEle = `<li class="chat__log__item">${userName}: ${msg}</li>`
+					} else if (flag === 'joined') {
+						liEle = `<li class="chat__log__joined">欢迎：${userName.fakerName} ${msg}，共 ${userName.userNum} 人！</li>`
+					} else if (flag === 'leaved') {
+						liEle = `<li class="chat__log__joined">${msg}</li>`
+					} else {
+						liEle = `<li class="chat__log__item chat__log__item__me">${userName}: ${msg}</li>`
+					}
+					$('#chat__log').innerHTML += liEle
+					$('#chat__log').scrollTop = $('#chat__log').scrollHeight
+				},
+			},
+			bind: function () {
+				var instance = this
+				var $ = instance.$
+				window.addEventListener('keydown', eve => {
+					if (eve.which === 13) {
+						instance.methods.enter.call(instance)
+					}
+				}, false)
+			},
+		}
+	</script>
+</body>
+</html>
